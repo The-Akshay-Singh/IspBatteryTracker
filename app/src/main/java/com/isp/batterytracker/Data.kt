@@ -3,6 +3,8 @@ package com.isp.batterytracker
 import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import java.time.LocalDate
 
 @Entity
@@ -10,7 +12,8 @@ data class Battery(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val serial: String, val model: String, val site: String, val area: String,
     val capacityAh: Double, val loadAmps: Double,
-    val installEpochDay: Long, val lifeMonths: Int
+    val installEpochDay: Long, val lifeMonths: Int,
+    val lat: Double? = null, val lng: Double? = null, val address: String? = null
 )
 
 @Entity(
@@ -31,13 +34,21 @@ interface IspDao {
     @Delete suspend fun delete(b: Battery)
 }
 
-@Database(entities = [Battery::class, HealthCheck::class], version = 1, exportSchema = false)
+val M12 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE Battery ADD COLUMN lat REAL")
+        db.execSQL("ALTER TABLE Battery ADD COLUMN lng REAL")
+        db.execSQL("ALTER TABLE Battery ADD COLUMN address TEXT")
+    }
+}
+
+@Database(entities = [Battery::class, HealthCheck::class], version = 2, exportSchema = false)
 abstract class Db : RoomDatabase() {
     abstract fun dao(): IspDao
     companion object {
         @Volatile private var inst: Db? = null
         fun get(c: Context): Db = inst ?: synchronized(this) {
-            inst ?: Room.databaseBuilder(c.applicationContext, Db::class.java, "isp.db").build().also { inst = it }
+            inst ?: Room.databaseBuilder(c.applicationContext, Db::class.java, "isp.db").addMigrations(M12).build().also { inst = it }
         }
     }
 }
